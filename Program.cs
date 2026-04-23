@@ -7,6 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                       ?? "Data Source=app.db";
 
+var redisConnection = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
 
@@ -20,6 +22,35 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddControllersWithViews();
+
+try
+{
+    if (builder.Environment.IsDevelopment())
+{
+    // Local: usamos memoria para no depender de Redis
+    builder.Services.AddDistributedMemoryCache();
+}
+else
+{
+    // Producción (Render): Redis real
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = builder.Configuration["Redis:ConnectionString"];
+    });
+}
+}
+catch
+{
+    builder.Services.AddDistributedMemoryCache();
+    Console.WriteLine("Redis no disponible. Usando cache en memoria.");
+}
+
+builder.Services.AddSession(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+});
 
 var app = builder.Build();
 
@@ -43,6 +74,8 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -20,6 +20,10 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options =>
 })
 .AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<ApplicationDbContext>();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.AccessDeniedPath = "/Home/Privacy";
+});
 
 builder.Services.AddControllersWithViews();
 
@@ -27,12 +31,12 @@ try
 {
     if (builder.Environment.IsDevelopment())
 {
-    // Local: usamos memoria para no depender de Redis
+   
     builder.Services.AddDistributedMemoryCache();
 }
 else
 {
-    // Producción (Render): Redis real
+    
     builder.Services.AddStackExchangeRedisCache(options =>
     {
         options.Configuration = builder.Configuration["Redis:ConnectionString"];

@@ -1,0 +1,54 @@
+@model PortalAcademico.Models.ViewModels.CursoMatriculasViewModel
+
+@{
+    ViewData["Title"] = "Matrículas por Curso";
+}
+
+<h1 class="mb-4">Matrículas de @Model.Curso.Nombre</h1>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<table class="table table-bordered table-striped">
+    <thead class="table-dark">
+        <tr>
+            <th>UsuarioId</th>
+            <th>Fecha Registro</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var matricula in Model.Matriculas)
+    {
+        <tr>
+            <td>@matricula.UsuarioId</td>
+            <td>@matricula.FechaRegistro.ToLocalTime()</td>
+            <td>@matricula.Estado</td>
+            <td>
+                @if (matricula.Estado != PortalAcademico.Data.Enums.EstadoMatricula.Confirmada)
+                {
+                    <form asp-action="ConfirmarMatricula" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@matricula.Id" />
+                        <button type="submit" class="btn btn-success btn-sm">Confirmar</button>
+                    </form>
+                }
+
+                @if (matricula.Estado != PortalAcademico.Data.Enums.EstadoMatricula.Cancelada)
+                {
+                    <form asp-action="CancelarMatricula" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@matricula.Id" />
+                        <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
+                    </form>
+                }
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<a asp-action="Index" class="btn btn-secondary">Volver al panel</a>

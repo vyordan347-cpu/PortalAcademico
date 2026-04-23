@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using PortalAcademico.Data;
 using PortalAcademico.Data.Enums;
 using PortalAcademico.Models;
@@ -12,10 +14,12 @@ namespace PortalAcademico.Controllers
     public class CursosController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IDistributedCache _cache;
 
-        public CursosController(ApplicationDbContext context)
+        public CursosController(ApplicationDbContext context, IDistributedCache cache)
         {
             _context = context;
+            _cache = cache;
         }
 
         [HttpGet]
@@ -37,36 +41,90 @@ namespace PortalAcademico.Controllers
                 ModelState.AddModelError(nameof(filtros.HorarioFin), "El horario fin debe ser mayor al horario inicio.");
             }
 
+            if (!ModelState.IsValid)
+            {
+                filtros.Cursos = new List<Curso>();
+                return View(filtros);
+            }
+
+            var sinFiltros =
+                string.IsNullOrWhiteSpace(filtros.Nombre) &&
+                !filtros.CreditosMin.HasValue &&
+                !filtros.CreditosMax.HasValue &&
+                !filtros.HorarioInicio.HasValue &&
+                !filtros.HorarioFin.HasValue;
+
+            if (sinFiltros)
+            {
+                string? cursosCacheados = null;
+
+                try
+                {
+                    cursosCacheados = await _cache.GetStringAsync(AppCacheKeys.CursosActivos);
+                }
+                catch
+                {
+                    // Redis no disponible
+                }
+
+                if (!string.IsNullOrEmpty(cursosCacheados))
+                {
+                    filtros.Cursos = JsonSerializer.Deserialize<List<Curso>>(cursosCacheados) ?? new List<Curso>();
+                    return View(filtros);
+                }
+
+                filtros.Cursos = await _context.Cursos
+                    .Where(c => c.Activo)
+                    .OrderBy(c => c.Nombre)
+                    .ToListAsync();
+
+                var opciones = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
+                };
+
+                try
+                {
+                    await _cache.SetStringAsync(
+                        AppCacheKeys.CursosActivos,
+                        JsonSerializer.Serialize(filtros.Cursos),
+                        opciones);
+                }
+                catch
+                {
+                    // Redis no disponible
+                }
+
+                return View(filtros);
+            }
+
             var query = _context.Cursos
                 .Where(c => c.Activo)
                 .AsQueryable();
 
-            if (ModelState.IsValid)
+            if (!string.IsNullOrWhiteSpace(filtros.Nombre))
             {
-                if (!string.IsNullOrWhiteSpace(filtros.Nombre))
-                {
-                    query = query.Where(c => c.Nombre.Contains(filtros.Nombre));
-                }
+                query = query.Where(c => c.Nombre.Contains(filtros.Nombre));
+            }
 
-                if (filtros.CreditosMin.HasValue)
-                {
-                    query = query.Where(c => c.Creditos >= filtros.CreditosMin.Value);
-                }
+            if (filtros.CreditosMin.HasValue)
+            {
+                query = query.Where(c => c.Creditos >= filtros.CreditosMin.Value);
+            }
 
-                if (filtros.CreditosMax.HasValue)
-                {
-                    query = query.Where(c => c.Creditos <= filtros.CreditosMax.Value);
-                }
+            if (filtros.CreditosMax.HasValue)
+            {
+                query = query.Where(c => c.Creditos <= filtros.CreditosMax.Value);
+            }
 
-                if (filtros.HorarioInicio.HasValue)
-                {
-                    query = query.Where(c => c.HorarioInicio >= filtros.HorarioInicio.Value);
-                }
+            if (filtros.HorarioInicio.HasValue)
+            {
+                query = query.Where(c => c.HorarioInicio >= filtros.HorarioInicio.Value);
+            }
 
-                if (filtros.HorarioFin.HasValue)
-                {
-                    query = query.Where(c => c.HorarioFin <= filtros.HorarioFin.Value);
-                }
+            if (filtros.HorarioFin.HasValue)
+            {
+                query = query.Where(c => c.HorarioFin <= filtros.HorarioFin.Value);
             }
 
             filtros.Cursos = await query
@@ -80,17 +138,16 @@ namespace PortalAcademico.Controllers
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
-            {
                 return NotFound();
-            }
 
             var curso = await _context.Cursos
                 .FirstOrDefaultAsync(c => c.Id == id && c.Activo);
 
             if (curso == null)
-            {
                 return NotFound();
-            }
+
+            HttpContext.Session.SetInt32(AppCacheKeys.UltimoCursoId, curso.Id);
+            HttpContext.Session.SetString(AppCacheKeys.UltimoCursoNombre, curso.Nombre);
 
             return View(curso);
         }
@@ -147,7 +204,7 @@ namespace PortalAcademico.Controllers
 
             if (hayCruceHorario)
             {
-                TempData["Error"] = "No puedes inscribirte porque el horario se cruza con otro curso ya matriculado.";
+                TempData["Error"] = "No puedes inscribirte porque el horario se cruza con otro curso.";
                 return RedirectToAction(nameof(Details), new { id });
             }
 
@@ -164,6 +221,18 @@ namespace PortalAcademico.Controllers
 
             TempData["Success"] = "Inscripción registrada correctamente en estado Pendiente.";
             return RedirectToAction(nameof(Details), new { id });
+        }
+
+        private async Task InvalidarCacheCursosAsync()
+        {
+            try
+            {
+                await _cache.RemoveAsync(AppCacheKeys.CursosActivos);
+            }
+            catch
+            {
+                // Redis no disponible
+            }
         }
     }
 }

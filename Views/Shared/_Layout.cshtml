@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using PortalAcademico.Data
+@using Microsoft.AspNetCore.Http
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -28,7 +30,21 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-controller="Cursos" asp-action="Index">Catálogo</a>
+
                         </li>
+                        @{
+                            var ultimoCursoId = Context.Session.GetInt32(AppCacheKeys.UltimoCursoId);
+                            var ultimoCursoNombre = Context.Session.GetString(AppCacheKeys.UltimoCursoNombre);
+                        }
+
+                        @if (ultimoCursoId.HasValue && !string.IsNullOrEmpty(ultimoCursoNombre))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Cursos" asp-action="Details" asp-route-id="@ultimoCursoId.Value">
+                                    Volver al curso @ultimoCursoNombre
+                                </a>
+                            </li>
+                        }
                     </ul>
                     <partial name="_LoginPartial" />
                 </div>

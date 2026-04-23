@@ -1,0 +1,56 @@
+@model List<PortalAcademico.Models.Curso>
+
+@{
+    ViewData["Title"] = "Panel de Coordinador";
+}
+
+<h1 class="mb-4">Panel de Coordinador</h1>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<p>
+    <a asp-action="CrearCurso" class="btn btn-primary">Nuevo curso</a>
+</p>
+
+<table class="table table-bordered table-striped">
+    <thead class="table-dark">
+        <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Créditos</th>
+            <th>Cupo</th>
+            <th>Horario</th>
+            <th>Activo</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var curso in Model)
+    {
+        <tr>
+            <td>@curso.Codigo</td>
+            <td>@curso.Nombre</td>
+            <td>@curso.Creditos</td>
+            <td>@curso.CupoMaximo</td>
+            <td>@curso.HorarioInicio.ToString("HH:mm") - @curso.HorarioFin.ToString("HH:mm")</td>
+            <td>@(curso.Activo ? "Sí" : "No")</td>
+            <td>
+                <a asp-action="EditarCurso" asp-route-id="@curso.Id" class="btn btn-warning btn-sm">Editar</a>
+                <a asp-action="MatriculasPorCurso" asp-route-id="@curso.Id" class="btn btn-info btn-sm">Matrículas</a>
+
+                @if (curso.Activo)
+                {
+                    <form asp-action="DesactivarCurso" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@curso.Id" />
+                        <button type="submit" class="btn btn-danger btn-sm">Desactivar</button>
+                    </form>
+                }
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

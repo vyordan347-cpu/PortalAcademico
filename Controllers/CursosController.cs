@@ -25,7 +25,6 @@ namespace PortalAcademico.Controllers
         [HttpGet]
         public async Task<IActionResult> Index(CatalogoCursosViewModel filtros)
         {
-            // Validaciones server-side
             if (filtros.CreditosMin.HasValue && filtros.CreditosMin.Value < 0)
             {
                 ModelState.AddModelError(nameof(filtros.CreditosMin), "Los créditos mínimos no pueden ser negativos.");
@@ -54,7 +53,6 @@ namespace PortalAcademico.Controllers
                 !filtros.CreditosMax.HasValue &&
                 !filtros.HorarioInicio.HasValue &&
                 !filtros.HorarioFin.HasValue;
-
 
             if (sinFiltros)
             {
@@ -136,7 +134,6 @@ namespace PortalAcademico.Controllers
             return View(filtros);
         }
 
-    
         [HttpGet]
         public async Task<IActionResult> Details(int? id)
         {
@@ -149,7 +146,6 @@ namespace PortalAcademico.Controllers
             if (curso == null)
                 return NotFound();
 
-            // Guardar en sesión
             HttpContext.Session.SetInt32(AppCacheKeys.UltimoCursoId, curso.Id);
             HttpContext.Session.SetString(AppCacheKeys.UltimoCursoNombre, curso.Nombre);
 
@@ -178,7 +174,6 @@ namespace PortalAcademico.Controllers
                 return RedirectToAction(nameof(Details), new { id });
             }
 
-        
             var yaMatriculado = await _context.Matriculas
                 .AnyAsync(m => m.CursoId == id && m.UsuarioId == usuarioId);
 
@@ -188,7 +183,6 @@ namespace PortalAcademico.Controllers
                 return RedirectToAction(nameof(Details), new { id });
             }
 
-    
             var cantidadMatriculados = await _context.Matriculas
                 .CountAsync(m => m.CursoId == id && m.Estado != EstadoMatricula.Cancelada);
 
@@ -214,7 +208,6 @@ namespace PortalAcademico.Controllers
                 return RedirectToAction(nameof(Details), new { id });
             }
 
-            // Crear matrícula
             var matricula = new Matricula
             {
                 CursoId = curso.Id,
@@ -229,6 +222,7 @@ namespace PortalAcademico.Controllers
             TempData["Success"] = "Inscripción registrada correctamente en estado Pendiente.";
             return RedirectToAction(nameof(Details), new { id });
         }
+
         private async Task InvalidarCacheCursosAsync()
         {
             try
